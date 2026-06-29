@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zombie Squad FPS - Mega Edition</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="gameWrapper">
+        <canvas id="viewCanvas"></canvas>
+        <canvas id="hudCanvas"></canvas>
+        
+        <div id="mainMenu" class="overlay">
+            <h1>🧟 ZOMBIE SQUAD 🧟</h1>
+            <p class="subtitle">— SURVIVE THE HORDE —</p>
+            <div id="charPreview"><canvas id="previewCanvas" width="128" height="128"></canvas></div>
+            <div id="charPreviewName"></div>
+            <button class="menu-btn" id="btnPlay">▶ MULAI SURVIVAL</button>
+            <button class="menu-btn" id="btnChars">🎨 PILIH OPERATOR</button>
+            <button class="menu-btn" id="btnMaps">🗺️ PILIH ZONA</button>
+            <div class="highscore-display">🏆 Best Wave: <span id="menuHighscore">0</span> | 🧟 Kills: <span id="menuKills">0</span></div>
+        </div>
+
+        <div id="charMenu" class="overlay hidden">
+            <h1>⚔️ PILIH OPERATOR ⚔️</h1>
+            <div class="grid-container" id="charGrid"></div>
+            <button class="menu-btn" id="btnBackChars">← KEMBALI</button>
+        </div>
+
+        <div id="mapMenu" class="overlay hidden">
+            <h1>🗺️ PILIH ZONA 🗺️</h1>
+            <div class="map-grid">
+                <div class="map-card" data-map="city">
+                    <div class="map-preview city"></div>
+                    <h3>🏙️ CITY RUINS</h3>
+                    <p>Gedung runtuh, banyak cover, zombie beragam</p>
+                </div>
+                <div class="map-card" data-map="forest">
+                    <div class="map-preview forest"></div>
+                    <h3>🌲 DARK FOREST</h3>
+                    <p>Kabut tebal, banyak runner, labirin pohon</p>
+                </div>
+                <div class="map-card" data-map="hospital">
+                    <div class="map-preview hospital"></div>
+                    <h3>🏥 ABANDONED HOSPITAL</h3>
+                    <p>Koridor sempit, brute zombie, sempit & gelap</p>
+                </div>
+            </div>
+            <button class="menu-btn" id="btnBackMaps">← KEMBALI</button>
+        </div>
+
+        <div id="gameOverScreen" class="overlay hidden">
+            <h1>💀 KAMU MATI 💀</h1>
+            <div class="score-box">
+                <div class="score-row">
+                    <div><span class="label">WAVE TERCAPAI</span><span class="value" id="finalWave">0</span></div>
+                    <div><span class="label">ZOMBIE DIBUNUH</span><span class="value" id="finalKills">0</span></div>
+                    <div><span class="label">HEADSHOT</span><span class="value" id="finalHeadshots">0</span></div>
+                </div>
+                <span class="highscore-label">Best: Wave <span class="highscore-value" id="finalHighscore">0</span></span>
+            </div>
+            <button class="menu-btn" id="btnRestart">🔄 MAIN LAGI</button>
+            <button class="menu-btn" id="btnMenu">← MENU UTAMA</button>
+        </div>
+
+        <div id="pauseScreen" class="overlay hidden">
+            <h1>⏸️ PAUSE</h1>
+            <button class="menu-btn" id="btnResume">▶ LANJUT</button>
+            <button class="menu-btn" id="btnQuit">🚪 KELUAR</button>
+        </div>
+
+        <div id="controlsHint">
+            WASD: Gerak | SHIFT: Lari | MOUSE: Lihat | KLIK: Tembak | R: Reload | 1/2/3: Senjata | ESC: Pause
+        </div>
+    </div>
+
+    <script src="js/characters.js"></script>
+    <script src="js/sound.js"></script>
+    <script src="js/raycast.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
