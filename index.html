@@ -4,13 +4,71 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zombie Squad FPS - Mega Edition</title>
-    <link rel="stylesheet" href="css/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Courier New', monospace; }
+        #gameWrapper { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+        #hudCanvas { pointer-events: none; z-index: 2; }
+        .overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 10; padding: 20px; transition: opacity 0.2s;
+        }
+        .overlay.hidden { opacity: 0; pointer-events: none; }
+        #mainMenu { background: linear-gradient(180deg, rgba(20,20,30,0.95), rgba(40,10,10,0.95)); }
+        #mainMenu h1 { font-size: clamp(2em, 6vw, 4em); color: #e74c3c; text-shadow: 4px 4px 0 #5a0000; letter-spacing: 4px; margin-bottom: 10px; animation: flicker 3s infinite; }
+        @keyframes flicker { 0%, 100% { opacity: 1; } 50% { opacity: 0.85; } }
+        .subtitle { color: #aaa; font-size: clamp(0.8em, 2vw, 1.2em); letter-spacing: 3px; margin-bottom: 20px; }
+        .menu-btn {
+            display: block; width: clamp(220px, 40vw, 340px); padding: 14px 20px; margin: 8px auto;
+            font-family: inherit; font-size: clamp(1em, 2.5vw, 1.3em); font-weight: bold;
+            text-transform: uppercase; letter-spacing: 2px; border: 3px solid #e74c3c;
+            border-radius: 6px; background: #1a1a2e; color: #e74c3c; cursor: pointer;
+            box-shadow: 4px 4px 0 #8b0000; transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .menu-btn:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 #8b0000; }
+        .menu-btn:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #8b0000; }
+        .highscore-display { margin-top: 20px; color: #fff; font-size: clamp(0.9em, 2vw, 1.2em); }
+        .highscore-display span { color: #f1c40f; font-weight: bold; font-size: 1.2em; }
+        #charPreview { width: clamp(70px, 12vw, 100px); height: clamp(70px, 12vw, 100px); margin: 15px auto; border: 3px solid #e74c3c; border-radius: 50%; overflow: hidden; box-shadow: 3px 3px 0 #8b0000; }
+        #charPreview canvas { width: 100%; height: 100%; }
+        #charPreviewName { color: #e74c3c; font-size: clamp(0.8em, 1.5vw, 1.1em); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 15px; }
+        .grid-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; width: 100%; max-width: 900px; max-height: 60vh; overflow-y: auto; padding: 10px; }
+        .character-card { text-align: center; padding: 10px; border: 3px solid #e74c3c; border-radius: 8px; background: #16213e; box-shadow: 3px 3px 0 #8b0000; cursor: pointer; transition: 0.1s; }
+        .character-card:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 #8b0000; }
+        .character-card.selected { border-color: #2ecc71; box-shadow: 3px 3px 0 #27ae60; }
+        .character-card .avatar { width: 100%; aspect-ratio: 1/1; border-radius: 6px; border: 2px solid #0f3460; overflow: hidden; }
+        .character-card .avatar canvas { width: 100%; height: 100%; image-rendering: pixelated; }
+        .character-card .character-name { margin-top: 8px; font-weight: bold; font-size: 0.8em; color: #f1c40f; text-transform: uppercase; }
+        .map-grid { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; margin-bottom: 20px; }
+        .map-card { width: 240px; padding: 15px; border: 3px solid #e74c3c; border-radius: 8px; background: #1a1a2e; cursor: pointer; text-align: center; transition: 0.2s; }
+        .map-card:hover { transform: scale(1.05); border-color: #f1c40f; }
+        .map-card.selected { border-color: #2ecc71; box-shadow: 0 0 15px rgba(46,204,113,0.5); }
+        .map-preview { width: 100%; height: 100px; border-radius: 4px; margin-bottom: 10px; }
+        .map-preview.city { background: linear-gradient(135deg, #4a4a4a, #2c3e50); }
+        .map-preview.forest { background: linear-gradient(135deg, #1e3b1e, #0a1f0a); }
+        .map-preview.hospital { background: linear-gradient(135deg, #bdc3c7, #7f8c8d); }
+        .map-card h3 { color: #fff; margin-bottom: 5px; }
+        .map-card p { color: #aaa; font-size: 0.8em; }
+        .score-box { background: #16213e; border: 3px solid #e74c3c; border-radius: 10px; padding: 20px 30px; margin-bottom: 25px; text-align: center; box-shadow: 4px 4px 0 #8b0000; }
+        .score-row { display: flex; gap: 30px; justify-content: center; margin-bottom: 15px; flex-wrap: wrap; }
+        .score-row > div { display: flex; flex-direction: column; align-items: center; }
+        .score-box .label { color: #aaa; font-size: 0.75em; letter-spacing: 2px; }
+        .score-box .value { color: #f1c40f; font-size: 2em; font-weight: bold; }
+        .score-box .highscore-label { color: #aaa; font-size: 0.9em; }
+        .score-box .highscore-value { color: #2ecc71; font-size: 1.3em; font-weight: bold; }
+        #controlsHint { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); color: rgba(255,255,255,0.6); font-size: 0.8em; text-align: center; z-index: 5; pointer-events: none; background: rgba(0,0,0,0.5); padding: 8px 15px; border-radius: 4px; }
+        #gameOverScreen h1, #pauseScreen h1 { color: #e74c3c; font-size: clamp(2em, 6vw, 3.5em); text-shadow: 3px 3px 0 #5a0000; margin-bottom: 20px; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1a1a2e; }
+        ::-webkit-scrollbar-thumb { background: #e74c3c; border-radius: 4px; }
+    </style>
 </head>
 <body>
     <div id="gameWrapper">
         <canvas id="viewCanvas"></canvas>
         <canvas id="hudCanvas"></canvas>
-        
         <div id="mainMenu" class="overlay">
             <h1>🧟 ZOMBIE SQUAD 🧟</h1>
             <p class="subtitle">— SURVIVE THE HORDE —</p>
@@ -21,64 +79,1192 @@
             <button class="menu-btn" id="btnMaps">🗺️ PILIH ZONA</button>
             <div class="highscore-display">🏆 Best Wave: <span id="menuHighscore">0</span> | 🧟 Kills: <span id="menuKills">0</span></div>
         </div>
-
         <div id="charMenu" class="overlay hidden">
             <h1>⚔️ PILIH OPERATOR ⚔️</h1>
             <div class="grid-container" id="charGrid"></div>
             <button class="menu-btn" id="btnBackChars">← KEMBALI</button>
         </div>
-
         <div id="mapMenu" class="overlay hidden">
             <h1>🗺️ PILIH ZONA 🗺️</h1>
             <div class="map-grid">
-                <div class="map-card" data-map="city">
-                    <div class="map-preview city"></div>
-                    <h3>🏙️ CITY RUINS</h3>
-                    <p>Gedung runtuh, banyak cover, zombie beragam</p>
-                </div>
-                <div class="map-card" data-map="forest">
-                    <div class="map-preview forest"></div>
-                    <h3>🌲 DARK FOREST</h3>
-                    <p>Kabut tebal, banyak runner, labirin pohon</p>
-                </div>
-                <div class="map-card" data-map="hospital">
-                    <div class="map-preview hospital"></div>
-                    <h3>🏥 ABANDONED HOSPITAL</h3>
-                    <p>Koridor sempit, brute zombie, sempit & gelap</p>
-                </div>
+                <div class="map-card" data-map="city"><div class="map-preview city"></div><h3>🏙️ CITY RUINS</h3><p>Gedung runtuh, banyak cover</p></div>
+                <div class="map-card" data-map="forest"><div class="map-preview forest"></div><h3>🌲 DARK FOREST</h3><p>Kabut tebal, banyak runner</p></div>
+                <div class="map-card" data-map="hospital"><div class="map-preview hospital"></div><h3>🏥 ABANDONED HOSPITAL</h3><p>Sempit, brute zombie</p></div>
             </div>
             <button class="menu-btn" id="btnBackMaps">← KEMBALI</button>
         </div>
-
         <div id="gameOverScreen" class="overlay hidden">
             <h1>💀 KAMU MATI 💀</h1>
             <div class="score-box">
                 <div class="score-row">
-                    <div><span class="label">WAVE TERCAPAI</span><span class="value" id="finalWave">0</span></div>
-                    <div><span class="label">ZOMBIE DIBUNUH</span><span class="value" id="finalKills">0</span></div>
-                    <div><span class="label">HEADSHOT</span><span class="value" id="finalHeadshots">0</span></div>
+                    <div><span class="label">WAVE</span><span class="value" id="finalWave">0</span></div>
+                    <div><span class="label">KILLS</span><span class="value" id="finalKills">0</span></div>
+                    <div><span class="label">HEADSHOTS</span><span class="value" id="finalHeadshots">0</span></div>
                 </div>
                 <span class="highscore-label">Best: Wave <span class="highscore-value" id="finalHighscore">0</span></span>
             </div>
             <button class="menu-btn" id="btnRestart">🔄 MAIN LAGI</button>
             <button class="menu-btn" id="btnMenu">← MENU UTAMA</button>
         </div>
-
         <div id="pauseScreen" class="overlay hidden">
             <h1>⏸️ PAUSE</h1>
             <button class="menu-btn" id="btnResume">▶ LANJUT</button>
             <button class="menu-btn" id="btnQuit">🚪 KELUAR</button>
         </div>
-
-        <div id="controlsHint">
-            WASD: Gerak | SHIFT: Lari | MOUSE: Lihat | KLIK: Tembak | R: Reload | 1/2/3: Senjata | ESC: Pause
-        </div>
+        <div id="controlsHint">WASD: Gerak | SHIFT: Lari | MOUSE: Lihat | KLIK: Tembak | R: Reload | 1-4: Senjata | ESC: Pause</div>
     </div>
 
-    <script src="js/characters.js"></script>
-    <script src="js/sound.js"></script>
-    <script src="js/raycast.js"></script>
-    <script src="js/game.js"></script>
-    <script src="js/main.js"></script>
+<script>
+// ============= CHARACTERS.JS =============
+const CHARACTERS = [
+    { name: "Delia", skin: "#f4c2a1", hair: "#1a1a1a", hairStyle: "hijab", hijabColor: "#4a90d9", eyeColor: "#3a2a1a", blush: true, accessory: null, mouthType: "smile" },
+    { name: "Eli", skin: "#d4955a", hair: "#2a1a0a", hairStyle: "cap", capColor: "#e74c3c", eyeColor: "#2a1a0a", blush: false, accessory: null, mouthType: "neutral" },
+    { name: "Brian", skin: "#c68642", hair: "#1a1a1a", hairStyle: "mohawk", mohawkColor: "#e74c3c", eyeColor: "#1a1a1a", blush: false, accessory: "sunglasses", mouthType: "cool" },
+    { name: "Andri", skin: "#f0b888", hair: "#2a1a0a", hairStyle: "sidePart", eyeColor: "#2a1a0a", blush: false, chubby: true, accessory: null, mouthType: "smile" },
+    { name: "Aprizal", skin: "#e8a87c", hair: "#1a0a00", hairStyle: "sidePart", eyeColor: "#1a0a00", blush: false, chubby: false, accessory: null, mouthType: "neutral" },
+    { name: "Rizky", skin: "#d4955a", hair: "#1a0a00", hairStyle: "sidePart", eyeColor: "#1a0a00", blush: true, accessory: null, mouthType: "bigSmile" },
+    { name: "Yodai", skin: "#c68642", hair: "#1a1a1a", hairStyle: "sidePart", eyeColor: "#1a1a1a", blush: false, accessory: "tie", mouthType: "stern" },
+    { name: "Indra", skin: "#f0b888", hair: "#2a1a0a", hairStyle: "sidePart", eyeColor: "#2a1a0a", blush: false, chubby: true, accessory: null, mouthType: "smile" },
+    { name: "Teguh", skin: "#e8a87c", hair: "#3a2a1a", hairStyle: "curly", eyeColor: "#3a2a1a", blush: false, accessory: "glasses", mouthType: "neutral" },
+    { name: "Aldi", skin: "#d4955a", hair: "#1a0a00", hairStyle: "short", eyeColor: "#1a0a00", blush: true, accessory: null, mouthType: "bigSmile" },
+];
+
+const ZOMBIE_SPRITES = { normal: [], runner: [], brute: [] };
+function generateZombieSprite(type) {
+    const c = document.createElement('canvas'); c.width = 64; c.height = 96;
+    const ctx = c.getContext('2d');
+    let skin, cloth, hair, eye, blood;
+    if (type === 'runner') { skin = '#7a8a5a'; cloth = '#4a2a2a'; hair = '#1a1a1a'; eye = '#ffff00'; blood = '#8b0000'; }
+    else if (type === 'brute') { skin = '#5a6a4a'; cloth = '#2a2a2a'; hair = '#0a0a0a'; eye = '#ff3300'; blood = '#5a0000'; }
+    else { skin = '#7a9a6a'; cloth = '#3a2a2a'; hair = '#2a1a1a'; eye = '#ffcc00'; blood = '#8b0000'; }
+    const cx = 32;
+    ctx.fillStyle = cloth; ctx.fillRect(cx - 12, 50, 24, 30);
+    ctx.fillStyle = '#1a1a1a'; ctx.fillRect(cx - 10, 52, 3, 4); ctx.fillRect(cx + 5, 58, 4, 3);
+    ctx.fillStyle = skin; ctx.fillRect(cx - 16, 52, 5, 22); ctx.fillRect(cx + 11, 52, 5, 22);
+    ctx.fillRect(cx - 14, 74, 6, 4); ctx.fillRect(cx + 10, 74, 6, 4);
+    ctx.fillStyle = blood; ctx.fillRect(cx - 15, 60, 3, 5);
+    ctx.fillStyle = '#1a1a1a'; ctx.fillRect(cx - 10, 80, 8, 14); ctx.fillRect(cx + 2, 80, 8, 14);
+    ctx.fillStyle = skin; ctx.fillRect(cx - 10, 28, 20, 22);
+    ctx.fillStyle = blood; ctx.fillRect(cx - 8, 32, 4, 2); ctx.fillRect(cx + 5, 40, 3, 3);
+    ctx.fillStyle = hair; ctx.fillRect(cx - 11, 25, 22, 6); ctx.fillRect(cx - 9, 22, 3, 5);
+    ctx.fillStyle = eye; ctx.fillRect(cx - 6, 36, 3, 3); ctx.fillRect(cx + 3, 36, 3, 3);
+    ctx.fillStyle = '#0a0000'; ctx.fillRect(cx - 5, 44, 10, 4);
+    ctx.fillStyle = '#dddddd';
+    for(let i=0;i<5;i++) ctx.fillRect(cx - 4 + i*2, 44, 1, 2);
+    ctx.fillStyle = blood; ctx.fillRect(cx - 3, 48, 1, 4); ctx.fillRect(cx + 2, 48, 1, 3);
+    return ctx.getImageData(0, 0, 64, 96);
+}
+function initZombieSprites() {
+    ['normal', 'runner', 'brute'].forEach(type => {
+        ZOMBIE_SPRITES[type].push(generateZombieSprite(type));
+        ZOMBIE_SPRITES[type].push(generateZombieSprite(type));
+    });
+}
+function drawCharacter(canvas, c) {
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width, H = canvas.height, S = W / 16;
+    ctx.clearRect(0, 0, W, H);
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, "#87CEEB"); grad.addColorStop(1, "#4a90d9");
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+    const cx = W / 2, faceY = H * 0.45;
+    const faceW = S * 6, faceH = c.chubby ? S * 6.5 : S * 6;
+    ctx.fillStyle = c.skin; ctx.fillRect(cx - S, faceY + faceH * 0.45, S * 2, S * 2);
+    const bodyColor = c.accessory === "tie" ? "#2c3e50" : "#3498db";
+    ctx.fillStyle = bodyColor;
+    ctx.fillRect(cx - S * 3.5, faceY + faceH * 0.55, S * 7, S * 1.5);
+    ctx.fillRect(cx - S * 2.5, faceY + faceH * 0.8, S * 5, S * 2.5);
+    if (c.accessory === "tie") { ctx.fillStyle = "#e74c3c"; ctx.fillRect(cx - S * 0.4, faceY + faceH * 0.6, S * 0.8, S * 2.5); }
+    ctx.fillStyle = c.skin;
+    roundRect(ctx, cx - faceW / 2, faceY - faceH / 2, faceW, faceH, S * 1.5); ctx.fill();
+    ctx.strokeStyle = "#1a1a1a"; ctx.lineWidth = S * 0.3;
+    roundRect(ctx, cx - faceW / 2, faceY - faceH / 2, faceW, faceH, S * 1.5); ctx.stroke();
+    ctx.fillStyle = c.hair;
+    if (c.hairStyle === "hijab") {
+        ctx.fillStyle = c.hijabColor;
+        ctx.beginPath(); ctx.ellipse(cx, faceY - faceH * 0.25, faceW * 0.6, faceH * 0.45, 0, Math.PI, 0); ctx.fill();
+    } else if (c.hairStyle === "cap") {
+        ctx.fillStyle = c.capColor;
+        ctx.fillRect(cx - faceW * 0.6, faceY - faceH * 0.5 - S * 0.5, faceW * 1.2, S * 0.8);
+    } else if (c.hairStyle === "mohawk") {
+        ctx.fillStyle = c.mohawkColor; ctx.fillRect(cx - S * 0.7, faceY - faceH * 0.5 - S * 3, S * 1.4, S * 3.5);
+    } else if (c.hairStyle === "curly") {
+        for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.arc(cx + i * S * 1.1, faceY - faceH * 0.45, S * 0.9, 0, Math.PI * 2); ctx.fill(); }
+    } else {
+        ctx.fillRect(cx - faceW * 0.5, faceY - faceH * 0.5 - S * 0.2, faceW, S * 1.2);
+    }
+    const eyeY = faceY - S * 0.5, eyeOffX = S * 1.3;
+    ctx.fillStyle = "white";
+    ctx.fillRect(cx - eyeOffX - S * 0.7, eyeY - S * 0.6, S * 1.4, S * 1.2);
+    ctx.fillRect(cx + eyeOffX - S * 0.7, eyeY - S * 0.6, S * 1.4, S * 1.2);
+    ctx.fillStyle = c.eyeColor;
+    ctx.fillRect(cx - eyeOffX - S * 0.2, eyeY - S * 0.3, S * 0.7, S * 0.7);
+    ctx.fillRect(cx + eyeOffX - S * 0.2, eyeY - S * 0.3, S * 0.7, S * 0.7);
+    if (c.accessory === "sunglasses") { ctx.fillStyle = "#1a1a1a"; ctx.fillRect(cx - eyeOffX - S * 0.9, eyeY - S * 0.8, S * 1.8, S * 1.4); ctx.fillRect(cx + eyeOffX - S * 0.9, eyeY - S * 0.8, S * 1.8, S * 1.4); }
+    if (c.accessory === "glasses") { ctx.strokeStyle = "white"; ctx.lineWidth = S * 0.35; ctx.strokeRect(cx - eyeOffX - S * 0.9, eyeY - S * 0.8, S * 1.8, S * 1.6); ctx.strokeRect(cx + eyeOffX - S * 0.9, eyeY - S * 0.8, S * 1.8, S * 1.6); }
+    const mouthY = faceY + S * 1.3;
+    ctx.fillStyle = "#c0392b";
+    if (c.mouthType === "smile") ctx.fillRect(cx - S * 0.9, mouthY, S * 1.8, S * 0.35);
+    else if (c.mouthType === "bigSmile") { ctx.fillRect(cx - S * 1.1, mouthY, S * 2.2, S * 0.35); }
+    else if (c.mouthType === "neutral") ctx.fillRect(cx - S * 0.7, mouthY + S * 0.2, S * 1.4, S * 0.35);
+    else if (c.mouthType === "stern") { ctx.fillStyle = "#8B0000"; ctx.fillRect(cx - S * 0.8, mouthY + S * 0.3, S * 1.6, S * 0.3); }
+    else if (c.mouthType === "cool") ctx.fillRect(cx - S * 0.3, mouthY + S * 0.3, S * 1, S * 0.3);
+    if (c.blush) {
+        ctx.fillStyle = "rgba(255, 120, 120, 0.4)";
+        ctx.beginPath(); ctx.ellipse(cx - eyeOffX - S * 0.3, faceY + S * 0.6, S * 0.8, S * 0.5, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(cx + eyeOffX + S * 0.3, faceY + S * 0.6, S * 0.8, S * 0.5, 0, 0, Math.PI * 2); ctx.fill();
+    }
+}
+function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
+    ctx.arcTo(x + w, y, x + w, y + r, r); ctx.lineTo(x + w, y + h - r);
+    ctx.arcTo(x + w, y + h, x + w - r, y + h, r); ctx.lineTo(x + r, y + h);
+    ctx.arcTo(x, y + h, x, y + h - r, r); ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r); ctx.closePath();
+}
+
+// ============= SOUND.JS =============
+const Sound = {
+    ctx: null, masterGain: null, enabled: true,
+    init() {
+        try {
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            this.masterGain = this.ctx.createGain();
+            this.masterGain.gain.value = 0.3;
+            this.masterGain.connect(this.ctx.destination);
+        } catch(e) { this.enabled = false; }
+    },
+    resume() { if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); },
+    playTone(freq, duration, type = 'sine', volume = 0.3) {
+        if (!this.enabled || !this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = type; osc.frequency.value = freq;
+        gain.gain.setValueAtTime(volume, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+        osc.connect(gain); gain.connect(this.masterGain);
+        osc.start(); osc.stop(this.ctx.currentTime + duration);
+    },
+    playNoise(duration, volume = 0.2, filterFreq = 1000) {
+        if (!this.enabled || !this.ctx) return;
+        const bufferSize = this.ctx.sampleRate * duration;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+        const source = this.ctx.createBufferSource(); source.buffer = buffer;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass'; filter.frequency.value = filterFreq;
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(volume, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+        source.connect(filter); filter.connect(gain); gain.connect(this.masterGain);
+        source.start();
+    },
+    gunshot(type) {
+        if (!this.enabled) return; this.resume();
+        if (type === 'KNIFE') { this.playTone(200, 0.1, 'sawtooth', 0.2); this.playNoise(0.05, 0.3, 2000); }
+        else if (type === 'SHOTGUN') { this.playNoise(0.3, 0.5, 800); this.playTone(80, 0.2, 'square', 0.3); }
+        else if (type === 'RIFLE') { this.playNoise(0.15, 0.4, 1500); this.playTone(120, 0.1, 'square', 0.25); }
+        else if (type === 'PISTOL') { this.playNoise(0.2, 0.3, 1200); this.playTone(150, 0.1, 'square', 0.2); }
+    },
+    reload() { if (!this.enabled) return; this.resume(); this.playTone(300, 0.05, 'square', 0.15); setTimeout(() => this.playTone(400, 0.05, 'square', 0.15), 200); },
+    zombieHit() { if (!this.enabled) return; this.resume(); this.playTone(100 + Math.random()*50, 0.15, 'sawtooth', 0.2); },
+    zombieDie() { if (!this.enabled) return; this.resume(); this.playTone(80, 0.3, 'sawtooth', 0.3); },
+    zombieGrowl() { if (!this.enabled) return; this.resume(); this.playTone(80 + Math.random() * 40, 0.4, 'sawtooth', 0.08); },
+    playerHurt() { if (!this.enabled) return; this.resume(); this.playTone(200, 0.15, 'square', 0.3); },
+    pickup(type) { if (!this.enabled) return; this.resume(); this.playTone(type==='health'?600:500, 0.1, 'sine', 0.2); setTimeout(()=>this.playTone(type==='health'?900:700, 0.15, 'sine', 0.2), 100); },
+    headshot() { if (!this.enabled) return; this.resume(); this.playTone(800, 0.1, 'sine', 0.3); setTimeout(() => this.playTone(1200, 0.15, 'sine', 0.3), 50); },
+    waveStart() { if (!this.enabled) return; this.resume(); [300,400,500,600].forEach((f,i) => setTimeout(()=>this.playTone(f,0.2,'sine',0.25), i*100)); },
+    empty() { if (!this.enabled) return; this.resume(); this.playTone(100, 0.05, 'square', 0.2); }
+};
+
+// ============= RAYCAST.JS =============
+const Raycast = {
+    map: [], props: [], mapW: 0, mapH: 0, texWidth: 64, texHeight: 64,
+    textures: {}, floorTextures: {}, zBuffer: [],
+    weaponBob: 0, weaponRecoil: 0,
+    aimSway: { x: 0, y: 0, tx: 0, ty: 0 },
+    particles: [],
+    init(canvas) {
+        this.canvas = canvas; this.ctx = canvas.getContext('2d', { willReadFrequently: true });
+        this.width = canvas.width; this.height = canvas.height;
+        this.imgData = this.ctx.createImageData(this.width, this.height);
+        this.buf = this.imgData.data;
+        this.generateTextures(); this.generateFloorTextures();
+    },
+    setMap(mapData) {
+        this.map = mapData.grid; this.props = mapData.props || [];
+        this.mapW = mapData.w; this.mapH = mapData.h; this.theme = mapData.theme;
+    },
+    generateTextures() {
+        const themes = {
+            city: { base: [85,85,85], dark: [50,50,50], accent: [120,120,120], brick: true },
+            forest: { base: [42,58,26], dark: [26,42,10], accent: [58,74,42], brick: false },
+            hospital: { base: [176,184,192], dark: [128,136,144], accent: [208,216,224], brick: false }
+        };
+        Object.keys(themes).forEach(t => {
+            const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+            const cx = c.getContext('2d'); const th = themes[t];
+            cx.fillStyle = `rgb(${th.base.join(',')})`; cx.fillRect(0, 0, 64, 64);
+            if (th.brick) {
+                cx.fillStyle = `rgb(${th.dark.join(',')})`;
+                for (let y = 0; y < 64; y += 12) {
+                    const offset = (Math.floor(y/12) % 2) * 16;
+                    for (let x = -16; x < 64; x += 32) { cx.fillRect(x + offset, y, 1, 12); cx.fillRect(x + offset, y, 32, 1); }
+                }
+            } else if (t === 'hospital') {
+                cx.fillStyle = `rgb(${th.dark.join(',')})`;
+                for (let y = 0; y < 64; y += 16) for (let x = 0; x < 64; x += 16) { cx.fillRect(x, y, 16, 1); cx.fillRect(x, y, 1, 16); }
+                cx.fillStyle = 'rgba(139, 0, 0, 0.6)'; cx.beginPath(); cx.arc(40, 30, 6, 0, Math.PI*2); cx.fill();
+            } else {
+                for (let i = 0; i < 50; i++) {
+                    const shade = Math.random() > 0.5 ? th.dark : th.accent;
+                    cx.fillStyle = `rgb(${shade.join(',')})`;
+                    cx.fillRect(Math.random()*64, Math.random()*64, 2+Math.random()*4, 1+Math.random()*2);
+                }
+            }
+            this.textures[t] = cx.getImageData(0, 0, 64, 64).data;
+        });
+    },
+    generateFloorTextures() {
+        const themes = {
+            city: { base: [50,50,55], detail: [35,35,40] },
+            forest: { base: [35,45,25], detail: [20,30,15] },
+            hospital: { base: [70,70,75], detail: [50,50,55] }
+        };
+        Object.keys(themes).forEach(t => {
+            const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+            const cx = c.getContext('2d'); const th = themes[t];
+            cx.fillStyle = `rgb(${th.base.join(',')})`; cx.fillRect(0, 0, 64, 64);
+            if (t === 'hospital') {
+                cx.fillStyle = `rgb(${th.detail.join(',')})`;
+                for (let y = 0; y < 64; y += 16) for (let x = 0; x < 64; x += 16) if ((x/16 + y/16) % 2 === 0) cx.fillRect(x, y, 16, 16);
+            } else {
+                for (let i = 0; i < 30; i++) {
+                    cx.fillStyle = `rgb(${th.detail.join(',')})`;
+                    cx.fillRect(Math.random()*64, Math.random()*64, 1+Math.random()*2, 1+Math.random()*2);
+                }
+            }
+            this.floorTextures[t] = cx.getImageData(0, 0, 64, 64).data;
+        });
+    },
+    addParticle(x, y, z, type) {
+        for (let i = 0; i < (type === 'blood' ? 8 : 4); i++) {
+            this.particles.push({ x, y, z: z + 0.3, vx: (Math.random()-0.5) * 0.08, vy: (Math.random()-0.5) * 0.08, vz: Math.random() * 0.05 + 0.02, life: 1, type });
+        }
+    },
+    updateParticles(dt) {
+        this.particles = this.particles.filter(p => {
+            p.x += p.vx; p.y += p.vy; p.z += p.vz; p.vz -= 0.002; p.life -= dt * 2;
+            return p.life > 0 && p.z > 0;
+        });
+    },
+    render(player, sprites, pickups) {
+        const w = this.width, h = this.height;
+        const buf = this.buf;
+        const map = this.map, mapW = this.mapW;
+        const tex = this.textures[this.theme] || this.textures.city;
+        const floorTex = this.floorTextures[this.theme] || this.floorTextures.city;
+        const zBuf = this.zBuffer = new Float32Array(w);
+        const bob = this.weaponBob; const recoil = this.weaponRecoil;
+        const horizonOffset = Math.floor(bob * 5 + recoil * 3);
+        for (let y = 0; y < h; y++) {
+            const isFloor = y > h / 2 + horizonOffset;
+            const p = isFloor ? (y - h/2 - horizonOffset) : (h/2 + horizonOffset - y);
+            if (p === 0) continue;
+            const rayDirX0 = player.dirX - player.planeX;
+            const rayDirY0 = player.dirY - player.planeY;
+            const rayDirX1 = player.dirX + player.planeX;
+            const rayDirY1 = player.dirY + player.planeY;
+            const rowDist = (0.5 * h) / p;
+            const floorStepX = rowDist * (rayDirX1 - rayDirX0) / w;
+            const floorStepY = rowDist * (rayDirY1 - rayDirY0) / w;
+            let floorX = player.x + rowDist * rayDirX0;
+            let floorY = player.y + rowDist * rayDirY0;
+            const fog = Math.min(1, rowDist / 12);
+            for (let x = 0; x < w; x++) {
+                const cellX = Math.floor(floorX), cellY = Math.floor(floorY);
+                let tx = Math.floor(64 * (floorX - cellX)) & 63;
+                let ty = Math.floor(64 * (floorY - cellY)) & 63;
+                floorX += floorStepX; floorY += floorStepY;
+                let r, g, b;
+                if (isFloor) {
+                    const tIdx = (ty * 64 + tx) * 4;
+                    r = floorTex[tIdx]; g = floorTex[tIdx+1]; b = floorTex[tIdx+2];
+                } else {
+                    r = 6; g = 6; b = 8;
+                }
+                r = r * (1-fog) + 10*fog; g = g * (1-fog) + 10*fog; b = b * (1-fog) + 10*fog;
+                const shade = Math.max(0.3, 1 - rowDist / 15);
+                r *= shade; g *= shade; b *= shade;
+                const i = (y * w + x) * 4;
+                buf[i] = r; buf[i+1] = g; buf[i+2] = b; buf[i+3] = 255;
+            }
+        }
+        for (let x = 0; x < w; x++) {
+            const cameraX = 2 * x / w - 1;
+            const rayDirX = player.dirX + player.planeX * cameraX;
+            const rayDirY = player.dirY + player.planeY * cameraX;
+            let mapX = Math.floor(player.x), mapY = Math.floor(player.y);
+            const deltaDistX = Math.abs(1 / rayDirX), deltaDistY = Math.abs(1 / rayDirY);
+            let stepX, stepY, sideDistX, sideDistY;
+            if (rayDirX < 0) { stepX = -1; sideDistX = (player.x - mapX) * deltaDistX; }
+            else { stepX = 1; sideDistX = (mapX + 1 - player.x) * deltaDistX; }
+            if (rayDirY < 0) { stepY = -1; sideDistY = (player.y - mapY) * deltaDistY; }
+            else { stepY = 1; sideDistY = (mapY + 1 - player.y) * deltaDistY; }
+            let hit = 0, side = 0, steps = 0;
+            while (!hit && steps < 40) {
+                if (sideDistX < sideDistY) { sideDistX += deltaDistX; mapX += stepX; side = 0; }
+                else { sideDistY += deltaDistY; mapY += stepY; side = 1; }
+                if (mapX < 0 || mapX >= mapW || mapY < 0 || mapY >= this.mapH) break;
+                if (map[mapY * mapW + mapX] > 0) hit = 1;
+                steps++;
+            }
+            if (!hit) { zBuf[x] = 1000; continue; }
+            let perpWallDist;
+            if (side === 0) perpWallDist = (mapX - player.x + (1 - stepX) / 2) / rayDirX;
+            else perpWallDist = (mapY - player.y + (1 - stepY) / 2) / rayDirY;
+            zBuf[x] = perpWallDist;
+            const lineHeight = Math.floor(h / perpWallDist);
+            let drawStart = Math.max(0, Math.floor(-lineHeight / 2 + h / 2 + horizonOffset));
+            let drawEnd = Math.min(h - 1, Math.floor(lineHeight / 2 + h / 2 + horizonOffset));
+            let wallX;
+            if (side === 0) wallX = player.y + perpWallDist * rayDirY;
+            else wallX = player.x + perpWallDist * rayDirX;
+            wallX -= Math.floor(wallX);
+            let texX = Math.floor(wallX * 64);
+            if (side === 0 && rayDirX > 0) texX = 63 - texX;
+            if (side === 1 && rayDirY < 0) texX = 63 - texX;
+            const step = 64 / lineHeight;
+            let texPos = (drawStart - horizonOffset - h / 2 + lineHeight / 2) * step;
+            const fog = Math.min(1, perpWallDist / 12);
+            const sideShade = side === 1 ? 0.7 : 1.0;
+            for (let y = drawStart; y <= drawEnd; y++) {
+                let texY = Math.floor(texPos) & 63; texPos += step;
+                const tIdx = (texY * 64 + texX) * 4;
+                let r = tex[tIdx], g = tex[tIdx+1], b = tex[tIdx+2];
+                r *= sideShade; g *= sideShade; b *= sideShade;
+                r = r * (1-fog) + 10*fog; g = g * (1-fog) + 10*fog; b = b * (1-fog) + 10*fog;
+                const i = (y * w + x) * 4;
+                buf[i] = r; buf[i+1] = g; buf[i+2] = b;
+            }
+        }
+        const allSprites = [
+            ...this.props.map(p => ({...p, type: 'prop'})),
+            ...sprites.map(s => ({...s, type: 'zombie'})),
+            ...pickups.map(p => ({...p, type: 'pickup'})),
+            ...this.particles.map(p => ({...p, type: 'particle'}))
+        ];
+        const spriteOrder = allSprites.map((s, i) => ({ i, dist: ((player.x-s.x)**2 + (player.y-s.y)**2) }))
+            .sort((a, b) => b.dist - a.dist);
+        for (const obj of spriteOrder) {
+            const s = allSprites[obj.i];
+            const spriteX = s.x - player.x, spriteY = s.y - player.y;
+            const invDet = 1.0 / (player.planeX * player.dirY - player.dirX * player.planeY);
+            const transformX = invDet * (player.dirY * spriteX - player.dirX * spriteY);
+            const transformY = invDet * (-player.planeY * spriteX + player.planeX * spriteY);
+            if (transformY <= 0.1) continue;
+            const spriteScreenX = Math.floor((w / 2) * (1 + transformX / transformY));
+            let spriteHeight, spriteWidth;
+            if (s.type === 'particle') { spriteHeight = 8; spriteWidth = 8; }
+            else if (s.type === 'pickup') { spriteHeight = Math.abs(Math.floor(h / transformY * 0.4)); spriteWidth = spriteHeight; }
+            else if (s.type === 'prop') {
+                const size = s.size || 1;
+                spriteHeight = Math.abs(Math.floor(h / transformY * size));
+                spriteWidth = spriteHeight * 0.7;
+            } else {
+                const size = s.typeZ === 'brute' ? 1.3 : (s.typeZ === 'runner' ? 0.9 : 1);
+                spriteHeight = Math.abs(Math.floor(h / transformY * size));
+                spriteWidth = Math.floor(spriteHeight * 0.6);
+            }
+            const drawStartY = Math.max(0, Math.floor(-spriteHeight / 2 + h / 2 + horizonOffset));
+            const drawEndY = Math.min(h - 1, Math.floor(spriteHeight / 2 + h / 2 + horizonOffset));
+            const drawStartX = Math.max(0, Math.floor(-spriteWidth / 2 + spriteScreenX));
+            const drawEndX = Math.min(w - 1, Math.floor(spriteWidth / 2 + spriteScreenX));
+            const fog = Math.min(0.9, transformY / 12);
+            if (s.type === 'particle') {
+                const color = s.type === 'blood' ? [139, 0, 0] : [255, 200, 50];
+                for (let stripe = drawStartX; stripe <= drawEndX; stripe++) {
+                    if (transformY < zBuf[stripe]) {
+                        for (let y = drawStartY; y <= drawEndY; y++) {
+                            const i = (y * w + stripe) * 4;
+                            buf[i] = color[0] * s.life; buf[i+1] = color[1] * s.life; buf[i+2] = color[2] * s.life;
+                        }
+                    }
+                }
+            } else if (s.type === 'pickup') {
+                const isHealth = s.pickupType === 'health';
+                const color = isHealth ? [255, 50, 50] : [255, 200, 50];
+                for (let stripe = drawStartX; stripe <= drawEndX; stripe++) {
+                    if (transformY < zBuf[stripe]) {
+                        for (let y = drawStartY; y <= drawEndY; y++) {
+                            const i = (y * w + stripe) * 4;
+                            const relY = (y - drawStartY) / spriteHeight;
+                            const relX = (stripe - drawStartX) / spriteWidth;
+                            const inCross = isHealth && ((relX > 0.35 && relX < 0.65) || (relY > 0.35 && relY < 0.65));
+                            const inBox = relX > 0.1 && relX < 0.9 && relY > 0.1 && relY < 0.9;
+                            if (inBox) {
+                                buf[i] = color[0] * (1-fog) * 0.8; buf[i+1] = color[1] * (1-fog) * 0.8; buf[i+2] = color[2] * (1-fog) * 0.8;
+                                if (inCross) { buf[i] = 255; buf[i+1] = 255; buf[i+2] = 255; }
+                            }
+                        }
+                    }
+                }
+            } else if (s.type === 'prop') {
+                for (let stripe = drawStartX; stripe <= drawEndX; stripe++) {
+                    if (transformY >= zBuf[stripe]) continue;
+                    for (let y = drawStartY; y <= drawEndY; y++) {
+                        const relX = (stripe - drawStartX) / spriteWidth;
+                        const relY = (y - drawStartY) / spriteHeight;
+                        const i = (y * w + stripe) * 4;
+                        let r, g, b, draw = true;
+                        if (s.propType === 'barrel') {
+                            if (relX > 0.2 && relX < 0.8 && relY > 0.1 && relY < 0.95) {
+                                r = 139*(1-fog); g = 69*(1-fog); b = 19*(1-fog);
+                                if (relY > 0.25 && relY < 0.3 || relY > 0.7 && relY < 0.75) { r = 60*(1-fog); g = 60*(1-fog); b = 60*(1-fog); }
+                            } else draw = false;
+                        } else if (s.propType === 'crate') {
+                            if (relX > 0.1 && relX < 0.9 && relY > 0.2 && relY < 0.95) {
+                                r = 160*(1-fog); g = 82*(1-fog); b = 45*(1-fog);
+                                if (Math.abs(relX - 0.5) < 0.03 || Math.abs(relY - 0.5) < 0.03) { r *= 0.6; g *= 0.6; b *= 0.6; }
+                            } else draw = false;
+                        } else if (s.propType === 'tree') {
+                            const trunk = relX > 0.4 && relX < 0.6 && relY > 0.5;
+                            const leaves = relY < 0.7 && Math.hypot(relX - 0.5, relY - 0.4) < 0.35;
+                            if (trunk) { r = 90*(1-fog); g = 60*(1-fog); b = 30*(1-fog); }
+                            else if (leaves) { r = 40*(1-fog); g = 80*(1-fog); b = 30*(1-fog); }
+                            else draw = false;
+                        } else if (s.propType === 'car') {
+                            const body = relY > 0.4 && relY < 0.9 && relX > 0.1 && relX < 0.9;
+                            const top = relY > 0.15 && relY < 0.45 && relX > 0.25 && relX < 0.75;
+                            if (body || top) {
+                                r = 80*(1-fog); g = 30*(1-fog); b = 30*(1-fog);
+                                if (top) { r = 40*(1-fog); g = 40*(1-fog); b = 50*(1-fog); }
+                            } else draw = false;
+                        } else draw = false;
+                        if (draw) { buf[i] = r; buf[i+1] = g; buf[i+2] = b; buf[i+3] = 255; }
+                    }
+                }
+            } else {
+                const frame = Math.floor(s.animFrame || 0) % 2;
+                const texData = ZOMBIE_SPRITES[s.typeZ || 'normal'][frame]?.data;
+                if (!texData) continue;
+                const texH = 96, texW = 64;
+                for (let stripe = drawStartX; stripe <= drawEndX; stripe++) {
+                    if (transformY >= zBuf[stripe]) continue;
+                    const texX = Math.floor(((stripe - (-spriteWidth/2 + spriteScreenX)) * texW) / spriteWidth);
+                    if (texX < 0 || texX >= texW) continue;
+                    for (let y = drawStartY; y <= drawEndY; y++) {
+                        const d = (y - drawStartY) * texH / spriteHeight;
+                        const texY = Math.floor(d) & (texH-1);
+                        const tIdx = (texY * texW + texX) * 4;
+                        const r = texData[tIdx], g = texData[tIdx+1], b = texData[tIdx+2], a = texData[tIdx+3];
+                        if (a < 50 || (r === 0 && g === 0 && b === 0)) continue;
+                        const i = (y * w + stripe) * 4;
+                        if (s.hitFlash > 0) { buf[i] = 255; buf[i+1] = 255; buf[i+2] = 255; }
+                        else { buf[i] = r * (1-fog); buf[i+1] = g * (1-fog); buf[i+2] = b * (1-fog); }
+                    }
+                }
+            }
+        }
+        this.ctx.putImageData(this.imgData, 0, 0);
+    }
+};
+
+// ============= GAME.JS =============
+const Game = {
+    state: 'MENU', player: null, zombies: [], pickups: [],
+    kills: 0, headshots: 0, wave: 0, waveTimer: 0,
+    waveZombiesLeft: 0, betweenWaves: false, map: null,
+    notifications: [], damageIndicators: [],
+    weapons: [
+        { name: 'KNIFE', dmg: 30, rate: 500, ammo: Infinity, mag: Infinity, spread: 0, auto: false, recoil: 0, range: 1.5 },
+        { name: 'PISTOL', dmg: 25, rate: 250, ammo: 60, mag: 12, spread: 0.02, auto: false, recoil: 0.5, range: 30 },
+        { name: 'SHOTGUN', dmg: 15, rate: 900, ammo: 32, mag: 8, spread: 0.12, auto: false, recoil: 1.2, range: 15, pellets: 6 },
+        { name: 'RIFLE', dmg: 22, rate: 100, ammo: 180, mag: 30, spread: 0.04, auto: true, recoil: 0.3, range: 40 }
+    ],
+    keys: {}, mouse: { down: false }, lastTime: 0,
+    selectedChar: 0, selectedMap: 'city',
+    highscore: { wave: parseInt(localStorage.getItem('zsWaveHS')) || 0, kills: parseInt(localStorage.getItem('zsKillsHS')) || 0 },
+    maps: {
+        city: {
+            theme: 'city', w: 32, h: 32,
+            grid: (() => {
+                const m = new Array(32*32).fill(0);
+                for (let i = 0; i < 32; i++) { m[i] = 1; m[31*32+i] = 1; m[i*32] = 1; m[i*32+31] = 1; }
+                const buildings = [
+                    {x:4,y:4,w:6,h:6}, {x:14,y:3,w:5,h:7}, {x:23,y:4,w:5,h:5},
+                    {x:3,y:14,w:7,h:5}, {x:14,y:13,w:4,h:6}, {x:22,y:12,w:6,h:7},
+                    {x:5,y:22,w:5,h:6}, {x:14,y:22,w:6,h:5}, {x:23,y:22,w:5,h:5}
+                ];
+                buildings.forEach(b => {
+                    for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) m[y*32+x] = 1;
+                });
+                for (let y = 5; y < 9; y++) { m[y*32+9] = 0; m[y*32+10] = 0; }
+                for (let y = 15; y < 18; y++) { m[y*32+6] = 0; m[y*32+7] = 0; }
+                for (let y = 24; y < 27; y++) { m[y*32+25] = 0; m[y*32+26] = 0; }
+                for (let x = 16; x < 20; x++) m[15*32+x] = 0;
+                for (let x = 25; x < 28; x++) m[24*32+x] = 0;
+                return m;
+            })(),
+            props: [
+                {x: 6.5, y: 12.5, propType: 'barrel', size: 0.7},
+                {x: 12.5, y: 10.5, propType: 'crate', size: 0.8},
+                {x: 20.5, y: 20.5, propType: 'car', size: 1.2},
+                {x: 26.5, y: 6.5, propType: 'barrel', size: 0.7},
+                {x: 9.5, y: 26.5, propType: 'crate', size: 0.8},
+                {x: 15.5, y: 20.5, propType: 'barrel', size: 0.7},
+                {x: 28.5, y: 28.5, propType: 'car', size: 1.2}
+            ],
+            spawn: { x: 2.5, y: 2.5 },
+            zombieSpawnCount: { normal: 5, runner: 2, brute: 1 }
+        },
+        forest: {
+            theme: 'forest', w: 32, h: 32,
+            grid: (() => {
+                const m = new Array(32*32).fill(0);
+                for (let i = 0; i < 32; i++) { m[i] = 1; m[31*32+i] = 1; m[i*32] = 1; m[i*32+31] = 1; }
+                for (let y = 2; y < 30; y += 3) {
+                    for (let x = 2; x < 30; x += 3) {
+                        if (Math.random() < 0.55 && !(x === 2 && y === 2)) {
+                            m[y*32+x] = 1;
+                            if (Math.random() < 0.4 && x+1 < 31) m[y*32+(x+1)] = 1;
+                            if (Math.random() < 0.4 && y+1 < 31) m[(y+1)*32+x] = 1;
+                        }
+                    }
+                }
+                for (let y = 14; y < 18; y++) for (let x = 14; x < 18; x++) m[y*32+x] = 0;
+                m[2*32+2] = 0; m[2*32+3] = 0; m[3*32+2] = 0;
+                return m;
+            })(),
+            props: (() => {
+                const p = [];
+                for (let i = 0; i < 25; i++) p.push({x: 2 + Math.random() * 28, y: 2 + Math.random() * 28, propType: 'tree', size: 1.5});
+                p.push({x: 16, y: 16, propType: 'crate', size: 0.8});
+                p.push({x: 6, y: 6, propType: 'barrel', size: 0.7});
+                return p;
+            })(),
+            spawn: { x: 2.5, y: 2.5 },
+            zombieSpawnCount: { normal: 3, runner: 6, brute: 1 }
+        },
+        hospital: {
+            theme: 'hospital', w: 32, h: 32,
+            grid: (() => {
+                const m = new Array(32*32).fill(0);
+                for (let i = 0; i < 32; i++) { m[i] = 1; m[31*32+i] = 1; m[i*32] = 1; m[i*32+31] = 1; }
+                for (let x = 2; x < 30; x++) m[7*32+x] = 1;
+                for (let x = 2; x < 30; x++) m[24*32+x] = 1;
+                for (let y = 2; y < 7; y++) m[y*32+10] = 1;
+                for (let y = 2; y < 7; y++) m[y*32+20] = 1;
+                for (let y = 8; y < 15; y++) m[y*32+15] = 1;
+                for (let y = 17; y < 24; y++) m[y*32+15] = 1;
+                for (let y = 25; y < 30; y++) m[y*32+10] = 1;
+                for (let y = 25; y < 30; y++) m[y*32+20] = 1;
+                m[7*32+5] = 0; m[7*32+15] = 0; m[7*32+25] = 0;
+                m[24*32+5] = 0; m[24*32+15] = 0; m[24*32+25] = 0;
+                m[4*32+10] = 0; m[4*32+20] = 0;
+                m[11*32+15] = 0; m[20*32+15] = 0;
+                m[27*32+10] = 0; m[27*32+20] = 0;
+                return m;
+            })(),
+            props: [
+                {x: 5.5, y: 3.5, propType: 'crate', size: 0.7},
+                {x: 25.5, y: 3.5, propType: 'barrel', size: 0.7},
+                {x: 15.5, y: 11.5, propType: 'crate', size: 0.7},
+                {x: 5.5, y: 20.5, propType: 'barrel', size: 0.7},
+                {x: 25.5, y: 20.5, propType: 'crate', size: 0.7}
+            ],
+            spawn: { x: 2.5, y: 2.5 },
+            zombieSpawnCount: { normal: 4, runner: 3, brute: 3 }
+        }
+    },
+    init() {
+        this.hudCanvas = document.getElementById('hudCanvas');
+        this.hudCtx = this.hudCanvas.getContext('2d');
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+        this.setupInput();
+        this.player = {
+            x: 2.5, y: 2.5, dirX: 1, dirY: 0, planeX: 0, planeY: 0.66,
+            health: 100, maxHealth: 100, stamina: 100, maxStamina: 100,
+            ammo: [Infinity, 60, 32, 180], mag: [Infinity, 12, 8, 30],
+            weapon: 0, lastShot: 0, reloading: false,
+            currentRecoil: 0, currentSpread: 0,
+            bobPhase: 0, bobIntensity: 0, stepTimer: 0
+        };
+        initZombieSprites();
+        Sound.init();
+        this.loop = this.loop.bind(this);
+        requestAnimationFrame(this.loop);
+    },
+    resize() {
+        const w = window.innerWidth, h = window.innerHeight;
+        const rw = Math.min(640, Math.floor(w / 2)), rh = Math.min(400, Math.floor(h / 2));
+        document.getElementById('viewCanvas').width = rw;
+        document.getElementById('viewCanvas').height = rh;
+        this.hudCanvas.width = w; this.hudCanvas.height = h;
+        Raycast.init(document.getElementById('viewCanvas'));
+    },
+    setupInput() {
+        document.addEventListener('keydown', e => {
+            this.keys[e.code] = true;
+            if (e.code === 'Escape') this.togglePause();
+            if (e.code === 'KeyR') this.reload();
+            if (e.code === 'Digit1') this.switchWeapon(0);
+            if (e.code === 'Digit2') this.switchWeapon(1);
+            if (e.code === 'Digit3') this.switchWeapon(2);
+            if (e.code === 'Digit4') this.switchWeapon(3);
+        });
+        document.addEventListener('keyup', e => this.keys[e.code] = false);
+        document.addEventListener('mousedown', e => {
+            if (this.state === 'PLAYING') {
+                if (!document.pointerLockElement) document.getElementById('gameWrapper').requestPointerLock();
+                this.mouse.down = true;
+                this.shoot();
+            }
+            Sound.resume();
+        });
+        document.addEventListener('mouseup', () => this.mouse.down = false);
+        document.addEventListener('mousemove', e => {
+            if (document.pointerLockElement && this.state === 'PLAYING') {
+                const sens = 0.002;
+                const rot = -e.movementX * sens;
+                const oldDirX = this.player.dirX;
+                this.player.dirX = this.player.dirX * Math.cos(rot) - this.player.dirY * Math.sin(rot);
+                this.player.dirY = oldDirX * Math.sin(rot) + this.player.dirY * Math.cos(rot);
+                const oldPlaneX = this.player.planeX;
+                this.player.planeX = this.player.planeX * Math.cos(rot) - this.player.planeY * Math.sin(rot);
+                this.player.planeY = oldPlaneX * Math.sin(rot) + this.player.planeY * Math.cos(rot);
+            }
+        });
+    },
+    startGame() {
+        const m = this.maps[this.selectedMap];
+        this.map = m; Raycast.setMap(m);
+        this.player.x = m.spawn.x; this.player.y = m.spawn.y;
+        this.player.dirX = 1; this.player.dirY = 0;
+        this.player.planeX = 0; this.player.planeY = 0.66;
+        this.player.health = 100; this.player.stamina = 100;
+        this.player.ammo = [Infinity, 60, 32, 180];
+        this.player.mag = [Infinity, 12, 8, 30];
+        this.player.weapon = 0; this.player.reloading = false;
+        this.player.currentRecoil = 0;
+        this.kills = 0; this.headshots = 0;
+        this.wave = 0; this.waveTimer = 3; this.betweenWaves = true;
+        this.zombies = []; this.pickups = [];
+        this.notifications = []; this.damageIndicators = [];
+        this.state = 'PLAYING';
+        document.getElementById('gameWrapper').requestPointerLock();
+        this.spawnPickups();
+        this.addNotification('Bersiap! Wave 1 mulai...', 2);
+    },
+    spawnPickups() {
+        for (let i = 0; i < 6; i++) {
+            let x, y, tries = 0;
+            do {
+                x = 2 + Math.random() * (this.map.w - 4);
+                y = 2 + Math.random() * (this.map.h - 4);
+                tries++;
+            } while (this.map.grid[Math.floor(y)*this.map.w+Math.floor(x)] !== 0 && tries < 20);
+            this.pickups.push({ x, y, pickupType: Math.random() < 0.5 ? 'health' : 'ammo', bob: Math.random() * Math.PI * 2 });
+        }
+    },
+    startWave() {
+        this.wave++; this.betweenWaves = false;
+        const base = this.map.zombieSpawnCount;
+        const mult = 1 + (this.wave - 1) * 0.3;
+        for (let i = 0; i < Math.ceil(base.normal * mult); i++) this.spawnZombie('normal');
+        for (let i = 0; i < Math.ceil(base.runner * mult); i++) this.spawnZombie('runner');
+        for (let i = 0; i < Math.floor(base.brute * mult); i++) this.spawnZombie('brute');
+        this.waveZombiesLeft = this.zombies.length;
+        Sound.waveStart();
+        this.addNotification(`⚠️ WAVE ${this.wave} ⚠️`, 3);
+        for (let i = 0; i < 2; i++) {
+            let x, y, tries = 0;
+            do { x = 2 + Math.random() * (this.map.w - 4); y = 2 + Math.random() * (this.map.h - 4); tries++; }
+            while (this.map.grid[Math.floor(y)*this.map.w+Math.floor(x)] !== 0 && tries < 20);
+            this.pickups.push({ x, y, pickupType: Math.random() < 0.5 ? 'health' : 'ammo', bob: Math.random() * Math.PI * 2 });
+        }
+    },
+    spawnZombie(type) {
+        const p = this.player;
+        let zx, zy, valid = false, tries = 0;
+        while (!valid && tries < 50) {
+            zx = 2 + Math.random() * (this.map.w - 4);
+            zy = 2 + Math.random() * (this.map.h - 4);
+            const mx = Math.floor(zx), my = Math.floor(zy);
+            const dist = Math.hypot(zx - p.x, zy - p.y);
+            if (this.map.grid[my * this.map.w + mx] === 0 && dist > 8) valid = true;
+            tries++;
+        }
+        if (!valid) return;
+        let hp, speed, dmg;
+        if (type === 'runner') { hp = 30 + Math.random() * 20; speed = 0.035 + this.wave * 0.003; dmg = 8; }
+        else if (type === 'brute') { hp = 120 + Math.random() * 40 + this.wave * 10; speed = 0.012 + this.wave * 0.001; dmg = 20; }
+        else { hp = 50 + Math.random() * 30 + this.wave * 5; speed = 0.02 + this.wave * 0.002; dmg = 12; }
+        this.zombies.push({
+            x: zx, y: zy, hp, maxHp: hp, speed, dmg, typeZ: type,
+            state: 'idle', attackTimer: 0, hit: 0,
+            animFrame: Math.random() * 2, animSpeed: type === 'runner' ? 0.3 : 0.15,
+            growlTimer: Math.random() * 5, hitFlash: 0
+        });
+    },
+    update(dt) {
+        if (this.state !== 'PLAYING') return;
+        const p = this.player; const m = this.map;
+        if (this.betweenWaves) {
+            this.waveTimer -= dt;
+            if (this.waveTimer <= 0) this.startWave();
+        } else if (this.zombies.filter(z => z.hp > 0).length === 0) {
+            this.betweenWaves = true; this.waveTimer = 5;
+            this.addNotification(`✓ Wave ${this.wave} CLEAR!`, 3);
+            p.health = Math.min(p.maxHealth, p.health + 20);
+            this.spawnPickups();
+        }
+        const running = this.keys['ShiftLeft'] && p.stamina > 0;
+        const baseSpeed = running ? 0.09 : 0.055;
+        const moveSpeed = baseSpeed * dt * 60;
+        let moving = false; let dx = 0, dy = 0;
+        if (this.keys['KeyW']) { dx += p.dirX; dy += p.dirY; moving = true; }
+        if (this.keys['KeyS']) { dx -= p.dirX; dy -= p.dirY; moving = true; }
+        if (this.keys['KeyA']) { dx += p.dirY; dy -= p.dirX; moving = true; }
+        if (this.keys['KeyD']) { dx -= p.dirY; dy += p.dirX; moving = true; }
+        const len = Math.hypot(dx, dy);
+        if (len > 0) { dx = dx/len * moveSpeed; dy = dy/len * moveSpeed; }
+        if (moving && running) p.stamina = Math.max(0, p.stamina - dt * 30);
+        else p.stamina = Math.min(p.maxStamina, p.stamina + dt * 15);
+        const r = 0.25;
+        const newX = p.x + dx, newY = p.y + dy;
+        const checkCell = (x, y) => {
+            if (x < 0 || x >= m.w || y < 0 || y >= m.h) return 1;
+            return m.grid[Math.floor(y)*m.w+Math.floor(x)];
+        };
+        if (checkCell(newX + (dx>0?r:-r), p.y) === 0) p.x = newX;
+        if (checkCell(p.x, newY + (dy>0?r:-r)) === 0) p.y = newY;
+        this.map.props && this.map.props.forEach(prop => {
+            const propSize = (prop.size || 1) * 0.4;
+            const dist = Math.hypot(p.x - prop.x, p.y - prop.y);
+            if (dist < propSize + r) {
+                const angle = Math.atan2(p.y - prop.y, p.x - prop.x);
+                const push = propSize + r - dist;
+                p.x += Math.cos(angle) * push; p.y += Math.sin(angle) * push;
+            }
+        });
+        if (moving) {
+            p.bobPhase += dt * (running ? 14 : 9);
+            p.bobIntensity = Math.min(1, p.bobIntensity + dt * 5);
+        } else p.bobIntensity = Math.max(0, p.bobIntensity - dt * 5);
+        Raycast.weaponBob = Math.sin(p.bobPhase) * p.bobIntensity;
+        p.currentRecoil = Math.max(0, p.currentRecoil - dt * 3);
+        p.currentSpread = Math.max(0, p.currentSpread - dt * 2);
+        Raycast.weaponRecoil = p.currentRecoil;
+        Raycast.aimSway.tx = Math.sin(performance.now() / 1500) * 0.3;
+        Raycast.aimSway.ty = Math.sin(performance.now() / 1200) * 0.2;
+        Raycast.aimSway.x += (Raycast.aimSway.tx - Raycast.aimSway.x) * dt * 3;
+        Raycast.aimSway.y += (Raycast.aimSway.ty - Raycast.aimSway.y) * dt * 3;
+        if (this.mouse.down && this.weapons[p.weapon].auto) this.shoot();
+        this.zombies.forEach(z => {
+            if (z.hp <= 0) return;
+            const dist = Math.hypot(p.x - z.x, p.y - z.y);
+            if (dist < 15) z.animFrame += z.animSpeed;
+            z.growlTimer -= dt;
+            if (z.growlTimer <= 0 && dist < 10 && Math.random() < 0.3) {
+                Sound.zombieGrowl(); z.growlTimer = 3 + Math.random() * 5;
+            }
+            if (dist < 15) {
+                const angle = Math.atan2(p.y - z.y, p.x - z.x);
+                const moveX = Math.cos(angle) * z.speed * dt * 60;
+                const moveY = Math.sin(angle) * z.speed * dt * 60;
+                const nx = z.x + moveX, ny = z.y + moveY;
+                if (m.grid[Math.floor(z.y)*m.w+Math.floor(nx)] === 0) z.x = nx;
+                if (m.grid[Math.floor(ny)*m.w+Math.floor(z.x)] === 0) z.y = ny;
+                this.zombies.forEach(oz => {
+                    if (oz === z || oz.hp <= 0) return;
+                    const od = Math.hypot(z.x - oz.x, z.y - oz.y);
+                    if (od < 0.6) {
+                        const ang = Math.atan2(z.y - oz.y, z.x - oz.x);
+                        z.x += Math.cos(ang) * 0.01; z.y += Math.sin(ang) * 0.01;
+                    }
+                });
+            }
+            if (dist < 0.8) {
+                z.attackTimer += dt;
+                if (z.attackTimer > 1) {
+                    p.health -= z.dmg;
+                    Sound.playerHurt();
+                    this.addDamageIndicator(z);
+                    z.attackTimer = 0;
+                    if (p.health <= 0) this.gameOver();
+                }
+            } else z.attackTimer = 0;
+            if (z.hit > 0) z.hit -= dt * 5;
+            if (z.hitFlash > 0) z.hitFlash -= dt * 5;
+        });
+        this.pickups = this.pickups.filter(pk => {
+            pk.bob += dt * 3;
+            const dist = Math.hypot(p.x - pk.x, p.y - pk.y);
+            if (dist < 0.8) {
+                if (pk.pickupType === 'health') {
+                    if (p.health < p.maxHealth) {
+                        p.health = Math.min(p.maxHealth, p.health + 40);
+                        Sound.pickup('health');
+                        this.addNotification('+40 HP', 1.5);
+                        return false;
+                    }
+                } else {
+                    if (p.weapon > 0) {
+                        p.ammo[p.weapon] += 15;
+                        Sound.pickup('ammo');
+                        this.addNotification('+15 AMMO', 1.5);
+                        return false;
+                    }
+                }
+            }
+            return true;
+        });
+        Raycast.updateParticles(dt);
+        this.notifications = this.notifications.filter(n => { n.time -= dt; return n.time > 0; });
+        this.damageIndicators = this.damageIndicators.filter(d => { d.time -= dt; return d.time > 0; });
+    },
+    addNotification(text, duration) {
+        this.notifications.push({ text, time: duration, max: duration });
+    },
+    addDamageIndicator(zombie) {
+        const p = this.player;
+        const angle = Math.atan2(zombie.y - p.y, zombie.x - p.x);
+        const playerAngle = Math.atan2(p.dirY, p.dirX);
+        let relAngle = angle - playerAngle;
+        while (relAngle > Math.PI) relAngle -= 2*Math.PI;
+        while (relAngle < -Math.PI) relAngle += 2*Math.PI;
+        this.damageIndicators.push({ angle: relAngle, time: 1 });
+    },
+    shoot() {
+        const p = this.player; const w = this.weapons[p.weapon];
+        const now = performance.now();
+        if (now - p.lastShot < w.rate || p.reloading) return;
+        if (p.mag[p.weapon] <= 0) { Sound.empty(); return; }
+        p.lastShot = now;
+        if (w.mag !== Infinity) p.mag[p.weapon]--;
+        p.currentRecoil += w.recoil;
+        p.currentSpread += w.spread;
+        Sound.gunshot(w.name);
+        const pellets = w.pellets || 1;
+        for (let i = 0; i < pellets; i++) this.doShot(w);
+    },
+    doShot(w) {
+        const p = this.player;
+        const spread = (Math.random() - 0.5) * (w.spread + p.currentSpread);
+        const shotDirX = p.dirX + Math.cos(Math.atan2(p.dirY, p.dirX) + Math.PI/2) * spread;
+        const shotDirY = p.dirY + Math.sin(Math.atan2(p.dirY, p.dirX) + Math.PI/2) * spread;
+        const len = Math.hypot(shotDirX, shotDirY);
+        const sdx = shotDirX / len, sdy = shotDirY / len;
+        let closest = null, minDist = w.range;
+        this.zombies.forEach(z => {
+            if (z.hp <= 0) return;
+            const dx = z.x - p.x, dy = z.y - p.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist > w.range) return;
+            const dot = (dx * sdx + dy * sdy) / dist;
+            const hitRadius = 0.5 + dist * 0.05;
+            const perpDist = Math.abs(dx * (-sdy) + dy * sdx);
+            if (dot > 0.95 && perpDist < hitRadius && dist < minDist) {
+                closest = z; minDist = dist;
+            }
+        });
+        if (closest) {
+            const headshotChance = Math.max(0, 0.3 - minDist * 0.01 - p.currentSpread * 2);
+            const isHeadshot = Math.random() < headshotChance;
+            const dmg = isHeadshot ? w.dmg * 2.5 : w.dmg;
+            closest.hp -= dmg;
+            closest.hit = 1;
+            closest.hitFlash = 0.3;
+            Sound.zombieHit();
+            Raycast.addParticle(closest.x, closest.y, 0.3, 'blood');
+            if (isHeadshot) {
+                Sound.headshot();
+                this.headshots++;
+                this.addNotification('💀 HEADSHOT!', 1);
+            }
+            if (closest.hp <= 0) {
+                this.kills++; this.waveZombiesLeft--;
+                Sound.zombieDie();
+                Raycast.addParticle(closest.x, closest.y, 0.5, 'blood');
+                const dead = closest;
+                setTimeout(() => {
+                    const idx = this.zombies.indexOf(dead);
+                    if (idx >= 0) this.zombies.splice(idx, 1);
+                }, 1500);
+            }
+        }
+    },
+    reload() {
+        const p = this.player; const w = this.weapons[p.weapon];
+        if (w.mag === Infinity || p.mag[p.weapon] === w.mag || p.ammo[p.weapon] <= 0 || p.reloading) return;
+        p.reloading = true; Sound.reload();
+        setTimeout(() => {
+            const need = w.mag - p.mag[p.weapon];
+            const take = Math.min(need, p.ammo[p.weapon]);
+            p.mag[p.weapon] += take;
+            if (p.ammo[p.weapon] !== Infinity) p.ammo[p.weapon] -= take;
+            p.reloading = false;
+        }, 1500);
+    },
+    switchWeapon(idx) {
+        if (idx >= 0 && idx < 4 && idx !== this.player.weapon) {
+            this.player.weapon = idx;
+            this.player.reloading = false;
+        }
+    },
+    gameOver() {
+        this.state = 'GAMEOVER';
+        document.exitPointerLock();
+        if (this.wave > this.highscore.wave) { this.highscore.wave = this.wave; localStorage.setItem('zsWaveHS', this.highscore.wave); }
+        if (this.kills > this.highscore.kills) { this.highscore.kills = this.kills; localStorage.setItem('zsKillsHS', this.highscore.kills); }
+        document.getElementById('finalWave').textContent = this.wave;
+        document.getElementById('finalKills').textContent = this.kills;
+        document.getElementById('finalHeadshots').textContent = this.headshots;
+        document.getElementById('finalHighscore').textContent = this.highscore.wave;
+        document.getElementById('gameOverScreen').classList.remove('hidden');
+    },
+    togglePause() {
+        if (this.state === 'PLAYING') {
+            this.state = 'PAUSED';
+            document.exitPointerLock();
+            document.getElementById('pauseScreen').classList.remove('hidden');
+        } else if (this.state === 'PAUSED') {
+            this.state = 'PLAYING';
+            document.getElementById('pauseScreen').classList.add('hidden');
+            document.getElementById('gameWrapper').requestPointerLock();
+        }
+    },
+    drawHUD() {
+        const ctx = this.hudCtx;
+        const w = this.hudCanvas.width, h = this.hudCanvas.height;
+        ctx.clearRect(0, 0, w, h);
+        if (this.state !== 'PLAYING' && this.state !== 'PAUSED') return;
+        const p = this.player;
+        const cx = w/2 + Raycast.aimSway.x * 2;
+        const cy = h/2 + Raycast.aimSway.y * 2 + p.currentRecoil * 5;
+        const spreadSize = 10 + p.currentSpread * 30;
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(cx - spreadSize, cy); ctx.lineTo(cx - 5, cy); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx + 5, cy); ctx.lineTo(cx + spreadSize, cy); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx, cy - spreadSize); ctx.lineTo(cx, cy - 5); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx, cy + 5); ctx.lineTo(cx, cy + spreadSize); ctx.stroke();
+        ctx.fillStyle = '#f00'; ctx.fillRect(cx - 1, cy - 1, 2, 2);
+        ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        ctx.font = 'bold 20px Courier New';
+        if (this.betweenWaves) {
+            ctx.fillStyle = '#f1c40f';
+            ctx.fillText(`WAVE ${this.wave + 1} DALAM ${Math.ceil(this.waveTimer)}...`, w/2, 70);
+        } else {
+            ctx.fillStyle = '#fff';
+            ctx.fillText(`WAVE ${this.wave}`, w/2, 10);
+            ctx.font = '16px Courier New';
+            ctx.fillText(`🧟 ${this.zombies.filter(z=>z.hp>0).length} tersisa`, w/2, 35);
+        }
+        const wep = this.weapons[p.weapon];
+        ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic';
+        ctx.font = 'bold 22px Courier New';
+        ctx.fillStyle = '#fff';
+        ctx.fillText(wep.name, w - 30, h - 90);
+        if (wep.mag !== Infinity) {
+            ctx.font = '20px Courier New';
+            ctx.fillStyle = p.mag[p.weapon] <= Math.ceil(wep.mag*0.3) ? '#e74c3c' : '#fff';
+            ctx.fillText(`${p.mag[p.weapon]} / ${p.ammo[p.weapon]}`, w - 30, h - 60);
+        }
+        if (p.reloading) {
+            ctx.fillStyle = '#f1c40f'; ctx.font = 'bold 22px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText('RELOADING...', w/2, h/2 + 60);
+        }
+        ctx.textAlign = 'right'; ctx.font = '14px Courier New';
+        for (let i = 0; i < 4; i++) {
+            ctx.fillStyle = i === p.weapon ? '#f1c40f' : 'rgba(255,255,255,0.5)';
+            ctx.fillText(`[${i+1}] ${this.weapons[i].name}`, w - 30, h - 120 - i*20);
+        }
+        ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+        const barW = 200, barH = 16, barX = 110;
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(barX, h - 50, barW, barH);
+        const hpPct = p.health / p.maxHealth;
+        ctx.fillStyle = hpPct > 0.5 ? '#2ecc71' : (hpPct > 0.25 ? '#f39c12' : '#e74c3c');
+        ctx.fillRect(barX, h - 50, barW * hpPct, barH);
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+        ctx.strokeRect(barX, h - 50, barW, barH);
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 14px Courier New';
+        ctx.fillText(`HP: ${Math.max(0, Math.floor(p.health))}`, barX + 5, h - 38);
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(barX, h - 30, barW, barH);
+        ctx.fillStyle = '#3498db';
+        ctx.fillRect(barX, h - 30, barW * (p.stamina / p.maxStamina), barH);
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+        ctx.strokeRect(barX, h - 30, barW, barH);
+        ctx.fillStyle = '#fff';
+        ctx.fillText('STAMINA', barX + 5, h - 18);
+        const pSize = 70;
+        ctx.save();
+        ctx.beginPath(); ctx.arc(50, 50, pSize/2, 0, Math.PI*2); ctx.clip();
+        const charCanvas = document.createElement('canvas');
+        charCanvas.width = 128; charCanvas.height = 128;
+        drawCharacter(charCanvas, CHARACTERS[this.selectedChar]);
+        ctx.drawImage(charCanvas, 50 - pSize/2, 50 - pSize/2, pSize, pSize);
+        ctx.restore();
+        ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(50, 50, pSize/2, 0, Math.PI*2); ctx.stroke();
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 12px Courier New';
+        ctx.textAlign = 'center';
+        ctx.fillText(CHARACTERS[this.selectedChar].name, 50, 95);
+        ctx.textAlign = 'center'; ctx.font = 'bold 16px Courier New';
+        ctx.fillStyle = '#f1c40f';
+        ctx.fillText(`💀 ${this.kills}  💢 ${this.headshots}`, w/2, h - 15);
+        ctx.textAlign = 'center'; ctx.font = 'bold 24px Courier New';
+        this.notifications.forEach((n, i) => {
+            const alpha = Math.min(1, n.time);
+            ctx.fillStyle = `rgba(255,255,100,${alpha})`;
+            ctx.fillText(n.text, w/2, h/2 - 100 - i * 35);
+        });
+        this.damageIndicators.forEach(d => {
+            const alpha = Math.min(1, d.time);
+            const dist = 120;
+            const ix = w/2 + Math.cos(d.angle) * dist;
+            const iy = h/2 + Math.sin(d.angle) * dist;
+            ctx.fillStyle = `rgba(255,0,0,${alpha})`;
+            ctx.beginPath();
+            ctx.moveTo(ix, iy);
+            ctx.lineTo(ix - Math.cos(d.angle)*20 - Math.sin(d.angle)*8, iy - Math.sin(d.angle)*20 + Math.cos(d.angle)*8);
+            ctx.lineTo(ix - Math.cos(d.angle)*20 + Math.sin(d.angle)*8, iy - Math.sin(d.angle)*20 - Math.cos(d.angle)*8);
+            ctx.fill();
+        });
+        const mmSize = Math.min(150, w * 0.15);
+        const mmScale = mmSize / this.map.w;
+        const mmX = w - mmSize - 20, mmY = 20;
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.fillRect(mmX - 3, mmY - 3, mmSize + 6, mmSize + 6);
+        ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 2;
+        ctx.strokeRect(mmX - 3, mmY - 3, mmSize + 6, mmSize + 6);
+        const viewRange = 8;
+        const px = Math.floor(p.x), py = Math.floor(p.y);
+        for (let y = Math.max(0, py-viewRange); y < Math.min(this.map.h, py+viewRange); y++) {
+            for (let x = Math.max(0, px-viewRange); x < Math.min(this.map.w, px+viewRange); x++) {
+                const cell = this.map.grid[y*this.map.w+x];
+                ctx.fillStyle = cell === 1 ? '#444' : (cell === 2 ? '#666' : '#1a1a1a');
+                ctx.fillRect(mmX + x*mmScale, mmY + y*mmScale, mmScale, mmScale);
+            }
+        }
+        ctx.fillStyle = '#2ecc71';
+        ctx.beginPath();
+        ctx.arc(mmX + p.x*mmScale, mmY + p.y*mmScale, 3, 0, Math.PI*2);
+        ctx.fill();
+        ctx.strokeStyle = '#2ecc71'; ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(mmX + p.x*mmScale, mmY + p.y*mmScale);
+        ctx.lineTo(mmX + (p.x + p.dirX*1.5)*mmScale, mmY + (p.y + p.dirY*1.5)*mmScale);
+        ctx.stroke();
+        this.zombies.forEach(z => {
+            if (z.hp > 0 && Math.hypot(z.x - p.x, z.y - p.y) < viewRange) {
+                ctx.fillStyle = z.typeZ === 'brute' ? '#8b0000' : (z.typeZ === 'runner' ? '#ff6600' : '#e74c3c');
+                ctx.fillRect(mmX + z.x*mmScale - 1.5, mmY + z.y*mmScale - 1.5, 3, 3);
+            }
+        });
+        this.pickups.forEach(pk => {
+            if (Math.hypot(pk.x - p.x, pk.y - p.y) < viewRange) {
+                ctx.fillStyle = pk.pickupType === 'health' ? '#ff3366' : '#f1c40f';
+                ctx.fillRect(mmX + pk.x*mmScale - 1, mmY + pk.y*mmScale - 1, 2, 2);
+            }
+        });
+        if (p.currentRecoil > 0.5) {
+            ctx.fillStyle = `rgba(255,200,50,${p.currentRecoil * 0.15})`;
+            ctx.fillRect(0, 0, w, h);
+        }
+        if (p.health < 30) {
+            const pulse = (Math.sin(performance.now() / 300) + 1) * 0.5;
+            ctx.strokeStyle = `rgba(255,0,0,${0.3 + pulse * 0.3})`;
+            ctx.lineWidth = 30;
+            ctx.strokeRect(0, 0, w, h);
+        }
+    },
+    loop(timestamp) {
+        const dt = Math.min((timestamp - this.lastTime) / 1000, 0.1);
+        this.lastTime = timestamp;
+        this.update(dt);
+        if (this.state === 'PLAYING' || this.state === 'PAUSED') {
+            Raycast.render(this.player, this.zombies, this.pickups);
+        }
+        this.drawHUD();
+        requestAnimationFrame(this.loop);
+    }
+};
+
+// ============= MAIN.JS =============
+document.addEventListener('DOMContentLoaded', () => {
+    Game.init();
+    Game.selectedChar = 0;
+    Game.selectedMap = 'city';
+    const mainMenu = document.getElementById('mainMenu');
+    const charMenu = document.getElementById('charMenu');
+    const mapMenu = document.getElementById('mapMenu');
+    const gameOver = document.getElementById('gameOverScreen');
+    const pauseScreen = document.getElementById('pauseScreen');
+    const controls = document.getElementById('controlsHint');
+    function showScreen(screen) {
+        [mainMenu, charMenu, mapMenu, gameOver, pauseScreen].forEach(s => s.classList.add('hidden'));
+        controls.style.display = 'none';
+        if (screen === 'main') { mainMenu.classList.remove('hidden'); controls.style.display = 'block'; }
+        if (screen === 'char') charMenu.classList.remove('hidden');
+        if (screen === 'map') mapMenu.classList.remove('hidden');
+        if (screen === 'gameover') gameOver.classList.remove('hidden');
+        if (screen === 'pause') pauseScreen.classList.remove('hidden');
+        if (screen === 'playing') { controls.style.display = 'block'; setTimeout(()=>controls.style.display='none', 4000); }
+    }
+    function updatePreview() {
+        const cvs = document.getElementById('previewCanvas');
+        drawCharacter(cvs, CHARACTERS[Game.selectedChar]);
+        document.getElementById('charPreviewName').textContent = CHARACTERS[Game.selectedChar].name;
+        document.getElementById('menuHighscore').textContent = Game.highscore.wave;
+        document.getElementById('menuKills').textContent = Game.highscore.kills;
+    }
+    function buildCharGrid() {
+        const grid = document.getElementById('charGrid');
+        grid.innerHTML = '';
+        CHARACTERS.forEach((c, i) => {
+            const card = document.createElement('div');
+            card.className = 'character-card' + (i === Game.selectedChar ? ' selected' : '');
+            const av = document.createElement('div'); av.className = 'avatar';
+            const cvs = document.createElement('canvas'); cvs.width = 128; cvs.height = 128;
+            drawCharacter(cvs, c);
+            av.appendChild(cvs);
+            const nm = document.createElement('div'); nm.className = 'character-name'; nm.textContent = c.name;
+            card.appendChild(av); card.appendChild(nm);
+            card.onclick = () => {
+                Game.selectedChar = i;
+                document.querySelectorAll('.character-card').forEach(x => x.classList.remove('selected'));
+                card.classList.add('selected');
+                updatePreview();
+            };
+            grid.appendChild(card);
+        });
+    }
+    document.getElementById('btnPlay').onclick = () => { showScreen('playing'); Game.startGame(); };
+    document.getElementById('btnChars').onclick = () => { showScreen('char'); buildCharGrid(); };
+    document.getElementById('btnBackChars').onclick = () => showScreen('main');
+    document.getElementById('btnMaps').onclick = () => showScreen('map');
+    document.getElementById('btnBackMaps').onclick = () => showScreen('main');
+    document.getElementById('btnRestart').onclick = () => { showScreen('playing'); Game.startGame(); };
+    document.getElementById('btnMenu').onclick = () => { Game.state = 'MENU'; showScreen('main'); updatePreview(); };
+    document.getElementById('btnResume').onclick = () => Game.togglePause();
+    document.getElementById('btnQuit').onclick = () => { Game.state = 'MENU'; document.exitPointerLock(); showScreen('main'); updatePreview(); };
+    document.querySelectorAll('.map-card').forEach(card => {
+        card.onclick = () => {
+            document.querySelectorAll('.map-card').forEach(c => c.classList.remove('selected'));
+            card.classList.add('selected');
+            Game.selectedMap = card.dataset.map;
+            setTimeout(() => { showScreen('playing'); Game.startGame(); }, 300);
+        };
+    });
+    updatePreview();
+    showScreen('main');
+});
+</script>
 </body>
 </html>
